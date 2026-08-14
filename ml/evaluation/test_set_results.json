@@ -1,0 +1,73 @@
+{
+  "test_results": {
+    "Linear Regression": {
+      "mae": 4.304298594243495e-13,
+      "rmse": 5.400097790275253e-13,
+      "r2": 1.0
+    },
+    "Random Forest": {
+      "mae": 15.013649668663195,
+      "rmse": 30.922513954758184,
+      "r2": 0.9974081444685173
+    },
+    "XGBoost": {
+      "mae": 10.68072496329141,
+      "rmse": 17.924959944394587,
+      "r2": 0.9991290813516246
+    }
+  },
+  "feature_importance": [
+    {
+      "feature": "numeric__water_consumption_m3_per_ha",
+      "importance": 0.6416032314300537,
+      "importance_pct": 64.16000366210938
+    },
+    {
+      "feature": "categorical__crop_type_Rice",
+      "importance": 0.2053028643131256,
+      "importance_pct": 20.530000686645508
+    },
+    {
+      "feature": "numeric__fertilizer_usage_kg_per_ha",
+      "importance": 0.0656539648771286,
+      "importance_pct": 6.570000171661377
+    },
+    {
+      "feature": "categorical__crop_type_Soybean",
+      "importance": 0.04709063097834587,
+      "importance_pct": 4.710000038146973
+    },
+    {
+      "feature": "numeric__electricity_consumption_kwh_per_ha",
+      "importance": 0.015864381566643715,
+      "importance_pct": 1.590000033378601
+    },
+    {
+      "feature": "categorical__crop_type_Wheat",
+      "importance": 0.01260710321366787,
+      "importance_pct": 1.2599999904632568
+    },
+    {
+      "feature": "numeric__fuel_consumption_liters_per_ha",
+      "importance": 0.007748452480882406,
+      "importance_pct": 0.7699999809265137
+    },
+    {
+      "feature": "categorical__crop_type_Sugarcane",
+      "importance": 0.002648435765877366,
+      "importance_pct": 0.25999999046325684
+    },
+    {
+      "feature": "categorical__crop_type_Maize",
+      "importance": 0.0008379121427424252,
+      "importance_pct": 0.07999999821186066
+    },
+    {
+      "feature": "categorical__crop_type_Cotton",
+      "importance": 0.0006430665962398052,
+      "importance_pct": 0.05999999865889549
+    }
+  ],
+  "n_train": 4429,
+  "n_test": 1108
+}
