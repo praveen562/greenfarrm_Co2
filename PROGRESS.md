@@ -265,10 +265,98 @@ Closely matches Phase 5's cross-validation numbers (XGBoost: CV R²=0.9991 vs. t
 - Wire the farms/predictions routers to real persistence (replacing their 501 stubs).
 
 ---
-## Phase 9 — PostgreSQL database ⏳ not started
-## Phase 10 — Authentication ⏳ not started
-## Phase 11 — React frontend scaffold ⏳ not started
-## Phase 12 — Prediction dashboard UI ⏳ not started
-## Phase 13 — Sustainability scoring & recommendations ⏳ not started
-## Phase 14 — Historical analytics ⏳ not started
-## Phase 15 — Testing, security, Docker, final cleanup ⏳ not started
+## Phase 9 — PostgreSQL database ✅
+(Header above was stale — this phase's SQLAlchemy models, Alembic migration, and
+`db/{base,base_class,session}.py` were actually already complete in the delivered
+repo; verified by inspection and a real `alembic upgrade head` run against a
+freshly-installed local Postgres 16 instance. Schema created cleanly.)
+
+---
+## Phase 10 — Authentication ✅
+
+**Files created:**
+- `backend/app/core/security.py` — bcrypt password hashing, JWT create/decode
+- `backend/app/api/deps.py` — `get_current_user` FastAPI dependency
+- `backend/tests/test_auth.py`, `backend/tests/test_farms.py` — 17 real tests
+
+**Files modified:**
+- `backend/app/api/v1/auth.py` — real `/register` (201, hashed password), `/login` (JWT), `/me` (protected)
+- `backend/app/api/v1/farms.py` — real CRUD wired to Postgres, every route behind `get_current_user`, every query scoped to `current_user.id`; cross-user access returns 404 (not 403) to avoid confirming another user's data exists
+- `backend/requirements.txt` — pinned `bcrypt==4.0.1` (see bug below)
+
+**Contract change (documented, not incidental):** `CarbonPredictionRequest` now takes `farm_id` instead of a raw `crop_type` — a prediction must belong to an owned farm so ownership can be checked and `crop_type`/`area` come from one source of truth (the farm), not a value the caller could mismatch. This was necessary to satisfy Phase 10's "protected prediction routes scoped to the user's own farms" requirement together with Phase 12's "total farm emissions = footprint × area".
+
+**Real bug caught and fixed:** `passlib[bcrypt]==1.7.4` (last released 2020) probes `bcrypt.__about__.__version__` at import time; `bcrypt>=4.1` (installed: 5.0.0) removed that attribute, which passlib's broken detection path surfaced as a misleading `ValueError: password cannot be longer than 72 bytes` instead of an `AttributeError`. Pinned `bcrypt==4.0.1` in requirements.txt to restore compatibility — a known, documented passlib/bcrypt interop issue, not a bug in this codebase's logic.
+
+**Test results (actually run against a real local Postgres 16 instance):**
+- `test_auth.py`: 9/9 passed — hashed password verified different from plaintext, duplicate email → 400, short password → 422, wrong password → 401, unknown email → 401, missing/invalid token → 401, valid token → 200 with correct user.
+- `test_farms.py`: 8/8 passed — auth required, CRUD works, invalid crop type / negative area → 422, cross-user farm access on GET/PATCH/DELETE all → 404.
+
+---
+## Phase 13 — Sustainability score ✅
+
+**Files created:** `backend/app/services/sustainability_score.py`
+
+**What was implemented:** deterministic linear score = `100 - ((footprint - MIN) / (MAX - MIN)) * 100`, clamped to [0,100], anchored to the real min (557.00) and max (3020.03) of `carbon_footprint_kg_co2e_per_ha` in `train.csv` post-cleaning — not arbitrary numbers. Fixed category thresholds (90+/75+/50+/<50) as specified.
+
+---
+## Phase 13B — Recommendation engine ✅
+
+**Files created:** `backend/app/services/recommendation_engine.py`
+
+**What was implemented:** rule-based, deterministic, no LLM. Each of the 4 numeric features is compared against its real Q3 (75th percentile) in `train.csv` — verified by directly querying the dataframe, not guessed:
+fertilizer 186.07 kg/ha, fuel 84.01 L/ha, water 10,104.55 m³/ha, electricity 446.21 kWh/ha. A "focus on the largest contributor" note is added when `carbon_category` is High/Very High. Falls back to a "maintain current practices" message when nothing is high. Capped at 5 items.
+
+---
+## Phase 14 — Historical analytics ✅
+
+**Files created:** `backend/tests/test_dashboard.py` — 6 real tests
+
+**Files modified:**
+- `backend/app/schemas/dashboard.py` — `DashboardSummary`, `HistoryPoint`, `CropStat`, `RecentPrediction`
+- `backend/app/api/v1/dashboard.py` — `/dashboard/summary`, `/dashboard/history`, `/dashboard/crop-stats`, all real SQL aggregation (`func.avg`, `func.count`) joined through `Farm.user_id` for scoping — no hardcoded stats.
+
+**Test results:** 6/6 passed — empty state returns nulls/zeros (not fake data), populated state returns real averages, cross-user scoping confirmed (user B sees 0 predictions after user A creates some), history and crop-stats endpoints confirmed.
+
+---
+## Combined Phase 10/13/13B/14 backend test run
+
+**40/40 tests passed** (9 auth + 8 farms + 11 predictions + 6 dashboard + 5 pre-existing DB model + 1 health check), against a real local PostgreSQL 16 instance with `alembic upgrade head` applied and the actual regenerated XGBoost model (`ml/evaluation/evaluate_and_save.py` rerun: MAE 10.68, RMSE 17.92, R²=0.9991, matching the previously documented Phase 6/8 numbers). `test_prediction_matches_direct_model_call` cross-checks the live API response against calling `model.predict(preprocessor.transform(...))` directly.
+
+**What remains for Phase 11/12:** React/TypeScript/Vite/Tailwind frontend (currently just a placeholder README) — login/register/dashboard/farms/predict/history pages, API client layer, JWT storage, charts.
+## Phase 11 — React frontend scaffold ✅
+## Phase 12 — Prediction dashboard UI ✅
+
+**Files created:** Full Vite + React + TypeScript + Tailwind app under `frontend/`:
+- `src/types/index.ts` — types mirroring backend Pydantic schemas exactly
+- `src/services/api.ts` — typed axios client, JWT injection, consistent error extraction
+- `src/context/AuthContext.tsx` — session state (sessionStorage-based JWT)
+- `src/components/{AppShell,GrowthRing,ProtectedRoute,ui}.tsx` — shared shell/nav, signature sustainability gauge, primitives
+- `src/pages/{Login,Register,Dashboard,Farms,Predict,History,ModelInfo}Page.tsx` — all 6 required pages + a model-info page
+- Tailwind design tokens (canopy/soil/clay/rust palette, Space Grotesk/Inter/JetBrains Mono type)
+
+**Backend addition to support the Model page:** `GET /api/v1/model/info` — reads `ml/evaluation/test_set_results.json` directly (never hardcodes metrics/importance in app code); 503 if that file is missing. Covered by `test_model_info.py`.
+
+**Verification performed:**
+- `npx tsc -b` — 0 errors (after fixing 3 real Recharts/Tailwind-select typing issues caught by the stricter project-reference build, not the looser `--noEmit` pass)
+- `npm run build` — succeeds, produces `dist/`
+- `npm run dev` — dev server confirmed serving (HTTP 200) on port 5173
+- Full curl-driven E2E flow against the **live running backend**: register → login → `/me` → create farm → predict (real XGBoost inference) → dashboard summary → history → unauthorized (401) → cross-user isolation (404 on farm access, empty dashboard for the second user) → invalid input (422) → invalid token (401). All passed exactly as expected.
+- Backend test suite re-run after every backend change: **41/41 passing** throughout.
+
+**Environment note (real, not a code bug):** background processes started with plain `&`/`nohup` were killed between tool-call boundaries in this sandbox; switched to `setsid ... </dev/null >log 2>&1 &` to fully detach backend/frontend dev servers so they'd survive and be testable across calls.
+
+**Docker:** intentionally not built or run per explicit instruction — `docker-compose.yml` and `Dockerfile`s exist and were reviewed for consistency (added `.dockerignore` files, a frontend `Dockerfile`) but execution was out of scope for this pass.
+
+---
+## Phase 15 — Final testing, security review ✅ (Docker excluded per instruction)
+
+**Backend:** 41/41 automated tests passing (auth 9, farms 8, predictions 11, dashboard 6, model info 1, pre-existing DB model tests 5, health check 1) — against a real local PostgreSQL 16 instance with the actual regenerated XGBoost model.
+
+**Manual E2E (real, executed via curl against the live server):** registration, login, JWT auth, farm creation, prediction (XGBoost inference cross-checked against direct model call in an earlier automated test), sustainability scoring, recommendations, PostgreSQL persistence, prediction history, dashboard statistics, unauthorized access rejection, cross-user data isolation, invalid input rejection, invalid-token rejection — all confirmed working.
+
+**Frontend:** typecheck + production build both succeed; dev server confirmed live; all required pages implemented against the real (not invented) API contract.
+
+**Security:** passwords bcrypt-hashed (never plaintext, verified in `test_auth.py`), JWT required on every protected route, farm/prediction/recommendation/dashboard data scoped to `current_user.id` everywhere (verified via multiple cross-user tests), negative numeric inputs rejected with 422, `.env` gitignored.
+
+**Not done:** Docker build/run (explicitly excluded).

@@ -15,6 +15,10 @@ alembic==1.13.2
 # --- Auth ---
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
+bcrypt==4.0.1  # passlib 1.7.4 (last released 2020) probes bcrypt.__about__.__version__,
+               # which bcrypt>=4.1 removed -> ValueError "password cannot be longer than
+               # 72 bytes" is a red herring; the real cause is this version mismatch.
+               # Pinning bcrypt<4.1 keeps the attribute passlib expects.
 python-multipart==0.0.9
 
 # --- ML runtime (inference only; training deps live in ml/requirements.txt) ---

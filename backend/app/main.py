@@ -8,7 +8,7 @@ Routers (auth, farms, predictions, dashboard) are added in later phases.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import auth, dashboard, farms, predictions
+from app.api.v1 import auth, dashboard, farms, model_info, predictions
 from app.core.config import get_settings
 
 settings = get_settings()
@@ -37,3 +37,4 @@ app.include_router(auth.router, prefix=f"{settings.API_V1_PREFIX}/auth", tags=["
 app.include_router(farms.router, prefix=f"{settings.API_V1_PREFIX}/farms", tags=["farms"])
 app.include_router(predictions.router, prefix=f"{settings.API_V1_PREFIX}/predictions", tags=["predictions"])
 app.include_router(dashboard.router, prefix=f"{settings.API_V1_PREFIX}/dashboard", tags=["dashboard"])
+app.include_router(model_info.router, prefix=f"{settings.API_V1_PREFIX}/model", tags=["model"])
