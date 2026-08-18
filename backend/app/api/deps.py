@@ -11,13 +11,21 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from app.core.security import decode_access_token, bearer_scheme
+from app.core.security import decode_access_token
 from app.db.session import get_db
 from app.models.user import User
 
+# auto_error=False so a missing Authorization header reaches this function
+# as `None` instead of FastAPI's default 403 Forbidden — HTTPBearer's
+# built-in auto-error uses 403 for "no credentials at all", which conflates
+# "not authenticated" with "authenticated but not permitted". We normalize
+# every missing/invalid/expired-token case to 401, matching standard
+# REST auth semantics and this project's documented contract.
+bearer_scheme = HTTPBearer(auto_error=False)
+
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> User:
     credentials_exception = HTTPException(
@@ -25,6 +33,9 @@ def get_current_user(
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+    if credentials is None:
+        raise credentials_exception
 
     token = credentials.credentials
 

@@ -7,7 +7,6 @@ the user's id as the `sub` claim and an expiry, signed with HS256.
 
 from datetime import datetime, timedelta, timezone
 
-from fastapi.security import HTTPBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
@@ -20,8 +19,6 @@ pwd_context = CryptContext(
     schemes=["bcrypt"],
     deprecated="auto"
 )
-
-bearer_scheme = HTTPBearer()
 
 
 def hash_password(password: str) -> str:
