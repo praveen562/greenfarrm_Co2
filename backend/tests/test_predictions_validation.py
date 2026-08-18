@@ -128,14 +128,23 @@ def test_valid_payload_returns_successful_prediction_and_persists():
     assert body["total_farm_emissions_kg_co2e"] == round(body["carbon_footprint_kg_co2e_per_ha"] * 10.0, 2)
     assert 0 <= body["sustainability_score"] <= 100
     assert body["sustainability_category"] in {"Excellent", "Good", "Moderate", "Needs Improvement"}
-    assert 1 <= len(body["recommendations"]) <= 5
+    plan = body["recommendation_plan"]
+    assert 0 <= len(plan["recommendations"]) <= 4
+    assert plan["baseline_carbon_footprint"] == body["carbon_footprint_kg_co2e_per_ha"]
+    assert 0 <= plan["estimated_total_reduction_percent"] <= 35
+    assert plan["projected_carbon_footprint"] <= plan["baseline_carbon_footprint"]
+    assert "simulated" in plan["simulation_notice"].lower()
+    for item in plan["recommendations"]:
+        assert item["category"] in {"Fertilizer", "Fuel", "Water", "Electricity"}
+        assert item["priority"] in {"High", "Medium", "Low"}
+        assert item["estimated_reduction_percent"] > 0
     assert body["model_used"] == "XGBoost Regressor"
 
     db = SessionLocal()
     persisted = db.get(Prediction, body["prediction_id"])
     assert persisted is not None
     assert persisted.farm_id == farm_id
-    assert len(persisted.recommendations) == len(body["recommendations"])
+    assert len(persisted.recommendations) == len(plan["recommendations"])
     db.close()
 
 

@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import AppShell from "../components/AppShell";
 import GrowthRing from "../components/GrowthRing";
+import CarbonReductionPlan from "../components/CarbonReductionPlan";
 import {
   Badge,
   Card,
@@ -198,23 +199,11 @@ export default function PredictPage() {
                   <p className="text-sm font-medium text-ink">{result.sustainability_category}</p>
                 </div>
               </div>
-
-              <div>
-                <p className="mb-2 font-display text-sm font-semibold text-ink">Recommendations</p>
-                <ul className="flex flex-col gap-2">
-                  {result.recommendations.map((rec, idx) => (
-                    <li
-                      key={idx}
-                      className="rounded-lg border border-canopy-100 bg-canopy-50/60 px-3 py-2 text-sm text-ink/80"
-                    >
-                      {rec}
-                    </li>
-                  ))}
-                </ul>
-              </div>
             </div>
           </Card>
         )}
+
+        {result && <CarbonReductionPlan plan={result.recommendation_plan} farmArea={selectedFarm?.area} />}
       </div>
     </AppShell>
   );

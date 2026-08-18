@@ -360,3 +360,30 @@ fertilizer 186.07 kg/ha, fuel 84.01 L/ha, water 10,104.55 m³/ha, electricity 44
 **Security:** passwords bcrypt-hashed (never plaintext, verified in `test_auth.py`), JWT required on every protected route, farm/prediction/recommendation/dashboard data scoped to `current_user.id` everywhere (verified via multiple cross-user tests), negative numeric inputs rejected with 422, `.env` gitignored.
 
 **Not done:** Docker build/run (explicitly excluded).
+
+---
+## Phase 13B revision — Practical recommendation engine redesign ✅
+
+Redesigned per explicit follow-up request, **without touching** the XGBoost model, training, preprocessing, database schema, authentication, dashboard, or prediction calculation — confirmed by the fact that no Alembic migration was needed.
+
+**Files changed:**
+- `backend/app/services/recommendation_engine.py` — full rewrite
+- `backend/app/services/prediction_service.py` — wired to new engine
+- `backend/app/schemas/prediction.py` — `RecommendationItem`/`RecommendationPlan` response models replacing `recommendations: list[str]`
+- `backend/tests/test_recommendation_engine.py` (new, 11 tests)
+- `backend/tests/test_predictions_validation.py` — updated for new response shape
+- `frontend/src/types/index.ts` — new types
+- `frontend/src/components/CarbonReductionPlan.tsx` (new) — farm-level summary + per-recommendation cards
+- `frontend/src/pages/PredictPage.tsx` — wired to the new component
+
+**What changed logically:**
+- Each of the 4 numeric inputs is bucketed into Moderate/High/Very High tiers using **real** median/Q3/Q90 of that feature in `train.csv` (not guessed) — an input at/below its median gets no recommendation at all.
+- Within a tier, the exact simulated reduction % is a deterministic linear interpolation (not random) between the tier's stated range (e.g. fertilizer Very High = 12-18%).
+- Recommendations are ranked by tier severity first, then by a per-crop category-emphasis list (e.g. Rice ranks Water first), then by magnitude — top 4 returned, duplicates impossible (one candidate per category).
+- Multiple recommendations are combined via diminishing returns (`1 - ∏(1 - pᵢ)`), **not summed**, and capped at a stated 35% prototype ceiling.
+- Every response carries `simulation_notice` explicitly stating these are prototype simulations, not IPCC/field-validated figures.
+- DB schema unchanged: structured item fields are JSON-serialized into the existing `recommendations.text` column; aggregate plan totals (baseline/% /kg/projected) are recomputed at read time from the persisted items, not stored separately.
+
+**Test results:** `test_recommendation_engine.py` — 11/11 passing (low-input farm → zero recommendations; each single-high-input farm → correct category, tier, and 0% duplication; multi-high-input farm → conservative combination confirmed less than naive sum and capped at 35%; every supported crop produces a valid plan; Rice water-recommendation mentions AWD; simulation notice never claims IPCC/field validation). Full suite re-run: **52/52 passing** (41 prior + 11 new). Frontend `tsc -b` and `npm run build` both clean after wiring `PredictPage.tsx` to the new `CarbonReductionPlan` component.
+
+**Sample real API response** (Rice, fertilizer 250 kg/ha, water 17,000 m³/ha): 4 ranked recommendations (Fertilizer 18% High priority first, per Rice's water-emphasis the Water item still appears but at High tier not Very High so ranks behind the three Very High items), combined 35% total (correctly capped from a raw ~36%), projected footprint 2772.05 → 1801.83 kg CO2e/ha, farm-level reduction 9,702.2 kg CO2e for a 10 ha farm.

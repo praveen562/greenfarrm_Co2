@@ -13,6 +13,31 @@ class CarbonPredictionRequest(BaseModel):
     electricity_consumption_kwh_per_ha: float = Field(ge=0)
 
 
+class RecommendationItem(BaseModel):
+    title: str
+    category: str  # "Fertilizer" | "Fuel" | "Water" | "Electricity" | "General"
+    priority: str  # "High" | "Medium" | "Low"
+    problem: str
+    action: str
+    advice: str
+    estimated_reduction_percent: float
+    estimated_reduction_kg_co2e_per_ha: float
+    projected_footprint_kg_co2e_per_ha: float
+
+
+class RecommendationPlan(BaseModel):
+    recommendations: list[RecommendationItem] = Field(default_factory=list)
+    baseline_carbon_footprint: float
+    estimated_total_reduction_percent: float
+    estimated_total_reduction_kg_co2e_per_ha: float
+    projected_carbon_footprint: float
+    estimated_total_reduction_kg_co2e_per_farm: float
+    simulation_notice: str = (
+        "Reduction values are simulated estimates for this prototype and are not "
+        "field-validated emission reductions."
+    )
+
+
 class CarbonPredictionResponse(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
@@ -24,6 +49,6 @@ class CarbonPredictionResponse(BaseModel):
     carbon_category: str  # "Low" | "Moderate" | "High" | "Very High"
     sustainability_score: int
     sustainability_category: str  # "Excellent" | "Good" | "Moderate" | "Needs Improvement"
-    recommendations: list[str] = Field(default_factory=list)
+    recommendation_plan: RecommendationPlan
     model_used: str = "XGBoost Regressor"
     created_at: datetime

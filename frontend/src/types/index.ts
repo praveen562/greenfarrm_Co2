@@ -26,6 +26,28 @@ export interface CarbonPredictionRequest {
   electricity_consumption_kwh_per_ha: number;
 }
 
+export interface RecommendationItem {
+  title: string;
+  category: "Fertilizer" | "Fuel" | "Water" | "Electricity" | "General";
+  priority: "High" | "Medium" | "Low";
+  problem: string;
+  action: string;
+  advice: string;
+  estimated_reduction_percent: number;
+  estimated_reduction_kg_co2e_per_ha: number;
+  projected_footprint_kg_co2e_per_ha: number;
+}
+
+export interface RecommendationPlan {
+  recommendations: RecommendationItem[];
+  baseline_carbon_footprint: number;
+  estimated_total_reduction_percent: number;
+  estimated_total_reduction_kg_co2e_per_ha: number;
+  projected_carbon_footprint: number;
+  estimated_total_reduction_kg_co2e_per_farm: number;
+  simulation_notice: string;
+}
+
 export interface CarbonPredictionResponse {
   prediction_id: number;
   farm_id: number;
@@ -35,7 +57,7 @@ export interface CarbonPredictionResponse {
   carbon_category: "Low" | "Moderate" | "High" | "Very High";
   sustainability_score: number;
   sustainability_category: "Excellent" | "Good" | "Moderate" | "Needs Improvement";
-  recommendations: string[];
+  recommendation_plan: RecommendationPlan;
   model_used: string;
   created_at: string;
 }
