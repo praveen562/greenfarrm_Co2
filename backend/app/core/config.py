@@ -11,6 +11,9 @@ from pydantic import AnyHttpUrl, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+_PLACEHOLDER_SECRETS = {"replace_with_a_long_random_string", "changeme", "change_me", "secret"}
+
+
 class Settings(BaseSettings):
     # --- App metadata ---
     PROJECT_NAME: str = "GreenFarm Carbon AI"
@@ -30,6 +33,18 @@ class Settings(BaseSettings):
     # --- ML artifact paths (relative to repo root) ---
     MODEL_PATH: str = "ml/models/carbon_model.joblib"
     PREPROCESSOR_PATH: str = "ml/models/preprocessor.joblib"
+
+    @field_validator("SECRET_KEY")
+    @classmethod
+    def secret_key_must_be_strong(cls, v: str) -> str:
+        # JWTs are signed with this key; a short or placeholder value lets
+        # anyone forge a token for any user. Fail at startup, not in prod.
+        if len(v) < 32 or v.strip().lower() in _PLACEHOLDER_SECRETS:
+            raise ValueError(
+                "SECRET_KEY must be at least 32 characters and not a placeholder. "
+                'Generate one with: python -c "import secrets; print(secrets.token_urlsafe(48))"'
+            )
+        return v
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod

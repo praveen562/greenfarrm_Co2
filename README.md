@@ -276,7 +276,7 @@ npm install
 Required `.env` values (backend, copied to `backend/.env`):
 ```
 DATABASE_URL=postgresql://greenfarm:<password>@localhost:5432/greenfarm_carbon_ai
-SECRET_KEY=<a long random string>
+SECRET_KEY=<>= 32 random chars; the app refuses to start otherwise. python -c "import secrets; print(secrets.token_urlsafe(48))">
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=60
 MODEL_PATH=ml/models/carbon_model.joblib

@@ -35,6 +35,15 @@ def verify_password(
     )
 
 
+# Verified against when the email is unknown, so "no such user" costs the same
+# bcrypt time as "wrong password" and response timing can't enumerate accounts.
+_DUMMY_HASH = pwd_context.hash("timing-equalisation-dummy")
+
+
+def burn_password_check(plain_password: str) -> None:
+    pwd_context.verify(plain_password, _DUMMY_HASH)
+
+
 def create_access_token(user_id: int) -> str:
     expire = datetime.now(timezone.utc) + timedelta(
         minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
@@ -59,7 +68,8 @@ def decode_access_token(token: str) -> int | None:
         payload = jwt.decode(
             token,
             settings.SECRET_KEY,
-            algorithms=[settings.ALGORITHM]
+            algorithms=[settings.ALGORITHM],
+            options={"require_exp": True},
         )
 
         user_id = payload.get("sub")

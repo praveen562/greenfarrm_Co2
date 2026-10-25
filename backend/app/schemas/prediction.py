@@ -5,12 +5,23 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.schemas.crop_type import CropType
 
 
+# Sanity ceilings for user-supplied inputs. They sit roughly 7-10x above the
+# largest value in ml/datasets/train.csv (fertilizer 280, fuel 125, water
+# 18,886, electricity 750) so legitimate heavy-use farms pass, while absurd
+# values (and inf/NaN, which previously crashed the model with a 500) are
+# rejected with a 422.
+MAX_FERTILIZER_KG_PER_HA = 2_000
+MAX_FUEL_LITERS_PER_HA = 1_000
+MAX_WATER_M3_PER_HA = 100_000
+MAX_ELECTRICITY_KWH_PER_HA = 7_500
+
+
 class CarbonPredictionRequest(BaseModel):
     farm_id: int
-    fertilizer_usage_kg_per_ha: float = Field(gt=0)
-    fuel_consumption_liters_per_ha: float = Field(ge=0)
-    water_consumption_m3_per_ha: float = Field(ge=0)
-    electricity_consumption_kwh_per_ha: float = Field(ge=0)
+    fertilizer_usage_kg_per_ha: float = Field(gt=0, le=MAX_FERTILIZER_KG_PER_HA, allow_inf_nan=False)
+    fuel_consumption_liters_per_ha: float = Field(ge=0, le=MAX_FUEL_LITERS_PER_HA, allow_inf_nan=False)
+    water_consumption_m3_per_ha: float = Field(ge=0, le=MAX_WATER_M3_PER_HA, allow_inf_nan=False)
+    electricity_consumption_kwh_per_ha: float = Field(ge=0, le=MAX_ELECTRICITY_KWH_PER_HA, allow_inf_nan=False)
 
 
 class RecommendationItem(BaseModel):

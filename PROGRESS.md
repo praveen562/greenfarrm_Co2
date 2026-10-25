@@ -387,3 +387,35 @@ Redesigned per explicit follow-up request, **without touching** the XGBoost mode
 **Test results:** `test_recommendation_engine.py` — 11/11 passing (low-input farm → zero recommendations; each single-high-input farm → correct category, tier, and 0% duplication; multi-high-input farm → conservative combination confirmed less than naive sum and capped at 35%; every supported crop produces a valid plan; Rice water-recommendation mentions AWD; simulation notice never claims IPCC/field validation). Full suite re-run: **52/52 passing** (41 prior + 11 new). Frontend `tsc -b` and `npm run build` both clean after wiring `PredictPage.tsx` to the new `CarbonReductionPlan` component.
 
 **Sample real API response** (Rice, fertilizer 250 kg/ha, water 17,000 m³/ha): 4 ranked recommendations (Fertilizer 18% High priority first, per Rice's water-emphasis the Water item still appears but at High tier not Very High so ranks behind the three Very High items), combined 35% total (correctly capped from a raw ~36%), projected footprint 2772.05 → 1801.83 kg CO2e/ha, farm-level reduction 9,702.2 kg CO2e for a 10 ha farm.
+
+---
+## Phase 15 — Security hardening pass ✅ (Docker still excluded)
+
+Found by **probing the running API**, not by assumption. Baseline before changes: 52/52 backend tests, `tsc -b` 0 errors, `npm run build` clean (re-verified from a fresh clone with regenerated ML artifacts).
+
+**Defects found and fixed**
+
+| Probe | Before | After |
+|---|---|---|
+| Prediction input `Infinity` / `NaN` | **500** (model crashed) | 422 |
+| Farm `area` = `Infinity` / `NaN` | **500** | 422 |
+| 422 for any `Infinity`/`NaN` body | the *error response itself* crashed (FastAPI echoes the rejected value, which isn't JSON-serialisable) | custom `RequestValidationError` handler returns `loc`/`msg`/`type` only (frontend reads `detail[].msg`, unchanged) |
+| Input `1e300` (water etc.) | **accepted and stored** | 422 — sanity ceilings ~7-10x above `train.csv` maxima (fertilizer 2000, fuel 1000, water 100000, electricity 7500; farm area 1,000,000 ha) |
+| 100,000-char password on register/login | **500** (passlib size error) | 422 — register 8-72 chars (bcrypt's real limit), login max 128 |
+| `SECRET_KEY` weak or the `.env.example` placeholder | accepted (forgeable JWTs) | app refuses to start unless >= 32 chars and not a placeholder |
+| JWT with no `exp` claim | accepted forever | rejected (`require_exp`) |
+| Login timing for unknown email vs wrong password | unknown email skipped bcrypt (enumerable by timing) | dummy bcrypt verify equalises cost |
+| CORS `allow_methods/headers=["*"]` | wildcard | only the methods/headers the frontend uses |
+
+**Tests:** `backend/tests/test_security_hardening.py` (32 cases incl. parametrised) — **84/84 passing** total. Live uvicorn check also run over real HTTP (register, login, farm, prediction, Infinity -> 422, no token -> 401).
+
+**Breaking change to note:** an existing `.env` whose `SECRET_KEY` is shorter than 32 characters will now fail at startup with a clear message. Generate one with `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
+
+**Not done (known gaps, deliberately out of scope):**
+- No rate limiting / lockout on `/auth/login` (needs a shared store such as Redis, or a dependency like slowapi).
+- JWTs have no revocation/refresh flow; they live for `ACCESS_TOKEN_EXPIRE_MINUTES` (60).
+- Token is kept in `sessionStorage` (readable by any XSS); no XSS sinks were found in `frontend/src` (`dangerouslySetInnerHTML`/`innerHTML`/`eval` all absent).
+- Docker/compose not built or run; note `docker-compose.yml` publishes Postgres on 5432.
+- `oxlint`: 0 errors, 1 pre-existing warning (`AuthContext.tsx` fast-refresh).
+
+**Environment note:** pinned `numpy==1.26.4` / `scikit-learn==1.5.2` / `pandas==2.2.2` have no Python 3.13 wheels — use Python 3.11 or 3.12.
