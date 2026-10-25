@@ -1,8 +1,12 @@
 import type { InputHTMLAttributes, LabelHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
+  // A caller-supplied background must win. Tailwind resolves two bg-* classes by
+  // stylesheet order, not by class order, so a hardcoded bg-white silently beat
+  // e.g. bg-canopy-800 and left white text on a white card.
+  const background = /(^|\s)bg-/.test(className) ? "" : "bg-white";
   return (
-    <div className={`rounded-xl2 border border-canopy-100 bg-white p-5 shadow-soft ${className}`}>
+    <div className={`rounded-xl2 border border-canopy-100 ${background} p-5 shadow-soft ${className}`}>
       {children}
     </div>
   );

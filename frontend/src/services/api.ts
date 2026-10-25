@@ -6,7 +6,9 @@ import type {
   DashboardSummary,
   Farm,
   HistoryPoint,
+  StoredPredictionExplanation,
   User,
+  WhatIfResponse,
 } from "../types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1";
@@ -101,6 +103,15 @@ export function deleteFarm(farmId: number) {
 // --- Predictions ---
 export function predictCarbon(payload: CarbonPredictionRequest) {
   return request<CarbonPredictionResponse>(() => api.post("/predictions/carbon", payload));
+}
+
+/** Runs the real model on hypothetical inputs. Nothing is saved. */
+export function whatIf(payload: CarbonPredictionRequest) {
+  return request<WhatIfResponse>(() => api.post("/predictions/what-if", payload));
+}
+
+export function getPredictionExplanation(predictionId: number) {
+  return request<StoredPredictionExplanation>(() => api.get(`/predictions/${predictionId}/explanation`));
 }
 
 export function getPredictionHistory() {

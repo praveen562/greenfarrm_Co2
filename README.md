@@ -202,6 +202,8 @@ Implementation: `backend/app/services/recommendation_engine.py`.
 | GET/PATCH/DELETE | `/api/v1/farms/{id}` | ✓ | Manage own farm (404 if not owned) |
 | POST | `/api/v1/predictions/carbon` | ✓ | Run XGBoost prediction on an owned farm; persists prediction + recommendations |
 | GET | `/api/v1/predictions/history` | ✓ | Own prediction history (optional `?farm_id=`) |
+| POST | `/api/v1/predictions/what-if` | ✓ | Run the real model on hypothetical inputs for an owned farm; **stores nothing**; returns prediction + SHAP breakdown |
+| GET | `/api/v1/predictions/{id}/explanation` | ✓ | Exact SHAP breakdown of a stored prediction (recomputed from its saved inputs) |
 | GET | `/api/v1/dashboard/summary` | ✓ | Totals, averages, recent predictions |
 | GET | `/api/v1/dashboard/history` | ✓ | Full history for charting |
 | GET | `/api/v1/dashboard/crop-stats` | ✓ | Per-crop prediction counts/averages |

@@ -62,6 +62,45 @@ export interface CarbonPredictionResponse {
   created_at: string;
 }
 
+export interface ExplanationFactor {
+  feature: string;
+  label: string;
+  value: number | string;
+  unit: string;
+  /** Signed SHAP value in kg CO2e/ha relative to the model's average prediction. */
+  contribution_kg_co2e_per_ha: number;
+  direction: "increases" | "decreases";
+}
+
+export interface PredictionExplanation {
+  /** Model average; base_value + sum(contributions) = the prediction. */
+  base_value: number;
+  factors: ExplanationFactor[];
+  method: string;
+  note: string;
+}
+
+export interface ExplainedPrediction {
+  carbon_footprint_kg_co2e_per_ha: number;
+  carbon_category: CarbonPredictionResponse["carbon_category"];
+  sustainability_score: number;
+  sustainability_category: CarbonPredictionResponse["sustainability_category"];
+  explanation: PredictionExplanation;
+}
+
+export interface WhatIfResponse extends ExplainedPrediction {
+  farm_id: number;
+  crop_type: CropType;
+  total_farm_emissions_kg_co2e: number;
+  persisted: boolean;
+}
+
+export interface StoredPredictionExplanation extends ExplainedPrediction {
+  prediction_id: number;
+  farm_id: number;
+  crop_type: CropType;
+}
+
 export interface RecentPrediction {
   prediction_id: number;
   farm_id: number;

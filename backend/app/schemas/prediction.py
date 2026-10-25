@@ -63,3 +63,46 @@ class CarbonPredictionResponse(BaseModel):
     recommendation_plan: RecommendationPlan
     model_used: str = "XGBoost Regressor"
     created_at: datetime
+
+
+class ExplanationFactor(BaseModel):
+    feature: str  # "crop_type" | "fertilizer_usage_kg_per_ha" | ...
+    label: str  # "Crop type" | "Fertilizer" | "Fuel" | "Water" | "Electricity"
+    value: float | str  # the input value (crop name for crop_type)
+    unit: str
+    contribution_kg_co2e_per_ha: float  # signed SHAP value
+    direction: str  # "increases" | "decreases"
+
+
+class PredictionExplanation(BaseModel):
+    base_value: float  # model's average prediction; base + sum(contributions) == prediction
+    factors: list[ExplanationFactor]  # sorted by absolute contribution, largest first
+    method: str
+    note: str
+
+
+class ExplainedPrediction(BaseModel):
+    """A prediction value together with its exact SHAP breakdown."""
+    carbon_footprint_kg_co2e_per_ha: float
+    carbon_category: str
+    sustainability_score: int
+    sustainability_category: str
+    explanation: PredictionExplanation
+
+
+class WhatIfRequest(CarbonPredictionRequest):
+    """Same inputs and the same validation limits as a real prediction."""
+
+
+class WhatIfResponse(ExplainedPrediction):
+    """A scenario result. Nothing is stored; the farm only supplies crop and area."""
+    farm_id: int
+    crop_type: CropType
+    total_farm_emissions_kg_co2e: float
+    persisted: bool = False
+
+
+class StoredPredictionExplanation(ExplainedPrediction):
+    prediction_id: int
+    farm_id: int
+    crop_type: CropType

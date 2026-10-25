@@ -2,6 +2,8 @@ import { useEffect, useState, type FormEvent } from "react";
 import AppShell from "../components/AppShell";
 import GrowthRing from "../components/GrowthRing";
 import CarbonReductionPlan from "../components/CarbonReductionPlan";
+import ExplanationChart from "../components/ExplanationChart";
+import WhatIfSimulator from "../components/WhatIfSimulator";
 import {
   Badge,
   Card,
@@ -15,7 +17,7 @@ import {
 } from "../components/ui";
 import * as api from "../services/api";
 import { ApiRequestError } from "../services/api";
-import type { CarbonPredictionResponse, Farm } from "../types";
+import type { CarbonPredictionRequest, CarbonPredictionResponse, Farm, StoredPredictionExplanation } from "../types";
 
 const CATEGORY_TONE: Record<string, "good" | "moderate" | "bad"> = {
   Low: "good",
@@ -37,6 +39,10 @@ export default function PredictPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<CarbonPredictionResponse | null>(null);
+  // The exact inputs that produced `result`; the what-if simulator starts from these.
+  const [submittedInputs, setSubmittedInputs] = useState<CarbonPredictionRequest | null>(null);
+  const [explained, setExplained] = useState<StoredPredictionExplanation | null>(null);
+  const [explainError, setExplainError] = useState<string | null>(null);
 
   useEffect(() => {
     api
@@ -54,16 +60,29 @@ export default function PredictPage() {
     e.preventDefault();
     setFormError(null);
     setResult(null);
+    setSubmittedInputs(null);
+    setExplained(null);
+    setExplainError(null);
     setIsSubmitting(true);
     try {
-      const prediction = await api.predictCarbon({
+      const payload: CarbonPredictionRequest = {
         farm_id: Number(farmId),
         fertilizer_usage_kg_per_ha: Number(fertilizer),
         fuel_consumption_liters_per_ha: Number(fuel),
         water_consumption_m3_per_ha: Number(water),
         electricity_consumption_kwh_per_ha: Number(electricity),
-      });
+      };
+      const prediction = await api.predictCarbon(payload);
       setResult(prediction);
+      setSubmittedInputs(payload);
+      // The explanation is a separate, non-critical call: if it fails the
+      // prediction and recommendations above still show.
+      api
+        .getPredictionExplanation(prediction.prediction_id)
+        .then(setExplained)
+        .catch((err) =>
+          setExplainError(err instanceof ApiRequestError ? err.message : "Could not load the explanation."),
+        );
     } catch (err) {
       setFormError(err instanceof ApiRequestError ? err.message : "Prediction failed.");
     } finally {
@@ -201,6 +220,33 @@ export default function PredictPage() {
               </div>
             </div>
           </Card>
+        )}
+
+        {explainError && <ErrorBanner message={explainError} />}
+
+        {result && explained && (
+          <ExplanationChart explanation={explained.explanation} footprint={explained.carbon_footprint_kg_co2e_per_ha} />
+        )}
+
+        {result && explained && submittedInputs && (
+          <WhatIfSimulator
+            key={result.prediction_id}
+            farmId={result.farm_id}
+            crop={result.crop_type}
+            farmArea={selectedFarm?.area}
+            baselineInputs={{
+              fertilizer_usage_kg_per_ha: submittedInputs.fertilizer_usage_kg_per_ha,
+              fuel_consumption_liters_per_ha: submittedInputs.fuel_consumption_liters_per_ha,
+              water_consumption_m3_per_ha: submittedInputs.water_consumption_m3_per_ha,
+              electricity_consumption_kwh_per_ha: submittedInputs.electricity_consumption_kwh_per_ha,
+            }}
+            baseline={{
+              footprint: explained.carbon_footprint_kg_co2e_per_ha,
+              score: explained.sustainability_score,
+              category: explained.carbon_category,
+              explanation: explained.explanation,
+            }}
+          />
         )}
 
         {result && <CarbonReductionPlan plan={result.recommendation_plan} farmArea={selectedFarm?.area} />}

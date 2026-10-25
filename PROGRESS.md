@@ -419,3 +419,26 @@ Found by **probing the running API**, not by assumption. Baseline before changes
 - `oxlint`: 0 errors, 1 pre-existing warning (`AuthContext.tsx` fast-refresh).
 
 **Environment note:** pinned `numpy==1.26.4` / `scikit-learn==1.5.2` / `pandas==2.2.2` have no Python 3.13 wheels — use Python 3.11 or 3.12.
+
+---
+## Feature — SHAP explanations + what-if simulator ✅
+
+**What it does.** On the Predict page, after a prediction: (1) a **"Why this footprint?"** chart shows how much each input (fertilizer, fuel, water, electricity, crop type) pushed the footprint above/below the model's average; (2) a **what-if simulator** with a slider + number box per input re-runs the real XGBoost model live and shows the new footprint, score, category, the change vs. the saved prediction, and a per-factor before/after table. Scenarios are never saved.
+
+**Design decisions**
+- **No new dependency.** Explanations use XGBoost's native exact TreeSHAP (`booster.predict(DMatrix, pred_contribs=True)`), not the `shap` package. Verified on the real model: `base_value + sum(contributions)` reproduces the prediction (max error 0.0012 before rounding). Model base value (average output) = 1507.55 kg CO2e/ha.
+- The 6 one-hot crop columns are collapsed back into a single "Crop type" factor; the 4 numeric inputs are reported individually.
+- `POST /predictions/what-if` is stateless (response has `persisted: false`), farm-scoped (404 for another user's farm), and uses the **same validation limits** as real predictions (inf/NaN and absurd values -> 422).
+- `GET /predictions/{id}/explanation` recomputes from the inputs saved with the prediction (no schema change, no migration).
+- The simulator warns when a slider is outside the training range ([DATA-DERIVED] from `train.csv`; tree models flatten out beyond it), and blocks values the API would reject.
+- Requests are debounced (250 ms) and stale responses are discarded.
+
+**Behaviour worth knowing:** changing one input can change how much the model credits the *others* (e.g. cutting water 17,000 -> 8,000 on a Rice farm moved fertilizer's contribution from +298 to +442). That is the model's real interaction structure, not a bug; the per-factor changes always sum to the total change, and the UI shows that "All factors" row plus a one-line explanation.
+
+**Files:** `backend/app/services/explanation_service.py`, additions to `backend/app/api/v1/predictions.py` and `schemas/prediction.py`, `backend/tests/test_explanations.py` (22 tests); frontend `ExplanationChart.tsx`, `WhatIfSimulator.tsx`, wiring in `PredictPage.tsx`, types and API client.
+
+**Verification (real execution):** backend **106/106** (84 + 22 new, incl. a test that what-if equals a real prediction exactly and that nothing is persisted); `tsc -b` 0 errors; `vite build` clean; `oxlint` 0 errors (1 pre-existing warning). Driven end-to-end in headless Chromium against the live backend: explanation renders 5 rows, slider/keyboard/number-box changes update the scenario, out-of-range and invalid warnings appear, Reset works, **exactly 1 prediction saved after all simulator use**, no horizontal overflow at 390 px width.
+
+**Pre-existing bug found and fixed while checking the UI:** `Card` hard-coded `bg-white`, which beat the `bg-canopy-800` passed by the Carbon Reduction Plan summary, giving white text on a white card (numbers invisible). `Card` now lets a caller-supplied `bg-*` win. This had passed `tsc` and build; only looking at the page caught it.
+
+**Not done / limits:** SHAP values are exact for this model but are *attributions of the model's output*, not causal effects — in particular the model was trained on a synthetic labelled dataset (see `ml/datasets/RAW_DATASET_SOURCES.md`). No frontend unit tests exist in the repo (verification was browser-driven).
